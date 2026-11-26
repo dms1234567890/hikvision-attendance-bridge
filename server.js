@@ -32,11 +32,10 @@ app.post('/hikvision-attendance', upload.any(), async (req, res) => {
     const event = (rawData && rawData.AccessControllerEvent) ? rawData.AccessControllerEvent : {};
 
     if (event.employeeNoString) {
-      const punchTime = rawData.dateTime || new Date().toISOString();
+      const punchTime = rawData.dateTime || "";
 
-      // Sirf 1 Nov 2026 aur uske baad ke sabhi punches hi Sheet mein jayenge
-      // 1 Nov 2026 se pehle ka purana backlog ignore ho jayega
-      if (punchTime < "2026-11-01T00:00:00") {
+      // Agar dateTime khali hai ya 1 Nov 2026 se pehle ka hai toh turant block karein
+      if (!punchTime || punchTime < "2026-11-01T00:00:00") {
         return res.status(200).send('OK');
       }
 
