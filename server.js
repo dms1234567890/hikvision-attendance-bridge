@@ -34,9 +34,9 @@ app.post('/hikvision-attendance', upload.any(), async (req, res) => {
     if (event.employeeNoString) {
       const punchTime = rawData.dateTime || new Date().toISOString();
 
-      // Sirf aaj (26 Nov 2026) aur aage ke sabhi LIVE punches hi Sheet mein jayenge
-      // 26 Nov 2026 se pehle ka purana backlog ignore ho jayega
-      if (punchTime < "2026-11-26T00:00:00") {
+      // Sirf 1 Nov 2026 aur uske baad ke sabhi punches hi Sheet mein jayenge
+      // 1 Nov 2026 se pehle ka purana backlog ignore ho jayega
+      if (punchTime < "2026-11-01T00:00:00") {
         return res.status(200).send('OK');
       }
 
@@ -50,7 +50,7 @@ app.post('/hikvision-attendance', upload.any(), async (req, res) => {
       };
 
       await axios.post(GOOGLE_SHEET_URL, payload);
-      console.log("Live Punch Saved:", payload.EMPLOYEE_ID, payload.NAME, payload.DATE_TIME);
+      console.log("Punch Saved:", payload.EMPLOYEE_ID, payload.NAME, payload.DATE_TIME);
     }
 
     res.status(200).send('OK');
