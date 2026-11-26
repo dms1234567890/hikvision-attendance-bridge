@@ -13,7 +13,7 @@ app.use(express.text({ type: ['text/xml', 'application/xml', 'text/plain'], limi
 // Aapka deploy kiya hua Google Sheet Web App URL
 const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbz66MdDf42jnvHxYLL4mWMCbqQWq651Jkfw1FDA3q9MrUcI-oLgSTTpxCuCm8AFGu80Xg/exec";
 
-// Health check route (Render ko jagaye rakhne aur status check ke liye)
+// Health check route (Render ko 24x7 jagaye rakhne ke liye)
 app.get('/', (req, res) => {
   res.status(200).send('Hikvision Bridge is Active!');
 });
@@ -21,11 +21,7 @@ app.get('/', (req, res) => {
 // Hikvision HTTP Listening Endpoint
 app.post('/hikvision-attendance', upload.any(), async (req, res) => {
   try {
-    console.log("=== NEW HIKVISION PACKET ===");
-    console.log("Content-Type:", req.headers['content-type']);
-    console.log("Body:", JSON.stringify(req.body));
-
-    // Machine ka raw data nikalna (chahe JSON ho, Form-Data ho, ya XML)
+    // Machine ka raw data nikalna
     let rawData = req.body;
     if (req.body && req.body.event_log) {
       rawData = typeof req.body.event_log === 'string'
@@ -35,28 +31,31 @@ app.post('/hikvision-attendance', upload.any(), async (req, res) => {
 
     const event = (rawData && rawData.AccessControllerEvent) ? rawData.AccessControllerEvent : {};
 
-    // Agar standard JSON event mila toh clean data bhejein, warna raw format bhi bhej dein
-    const payload = event.employeeNoString ? {
-      EMPLOYEE_ID: event.employeeNoString,
-      NAME: event.name || "UNKNOWN",
-      DATE_TIME: rawData.dateTime || new Date().toISOString(),
-      VERIFY_MODE: event.currentVerifyMode || "",
-      DEVICE_NAME: rawData.deviceName || "MAIN_DEVICE",
-      EVENT_TYPE: event.subEventType || ""
-    } : {
-      RAW_FORMAT_TEST: typeof rawData === 'string'
-        ? rawData.substring(0, 500)
-        : JSON.stringify(rawData).substring(0, 500),
-      CONTENT_TYPE: req.headers['content-type'] || "UNKNOWN"
-    };
+    if (event.employeeNoString) {
+      const punchTime = rawData.dateTime || new Date().toISOString();
 
-    await axios.post(GOOGLE_SHEET_URL, payload);
-    console.log("Forwarded to Google Sheet:", JSON.stringify(payload));
+      // Sirf aaj (26 Nov 2026) aur aage ke sabhi LIVE punches hi Sheet mein jayenge
+      // 26 Nov 2026 se pehle ka purana backlog ignore ho jayega
+      if (punchTime < "2026-11-26T00:00:00") {
+        return res.status(200).send('OK');
+      }
+
+      const payload = {
+        EMPLOYEE_ID: event.employeeNoString,
+        NAME: event.name || "UNKNOWN",
+        DATE_TIME: punchTime,
+        VERIFY_MODE: event.currentVerifyMode || "",
+        DEVICE_NAME: rawData.deviceName || "MAIN_DEVICE",
+        EVENT_TYPE: event.subEventType || ""
+      };
+
+      await axios.post(GOOGLE_SHEET_URL, payload);
+      console.log("Live Punch Saved:", payload.EMPLOYEE_ID, payload.NAME, payload.DATE_TIME);
+    }
 
     res.status(200).send('OK');
   } catch (error) {
     console.error("Error processing Hikvision event:", error.message);
-    // Hikvision ko hamesha 200 OK bhejna zaroori hai taaki retry loop na bane
     res.status(200).send('OK');
   }
 });
